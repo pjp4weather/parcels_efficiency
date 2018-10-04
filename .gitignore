@@ -1,0 +1,4 @@
+*.nc
+out/
+*.pyc
+.gitignore~
