@@ -11,7 +11,7 @@ import numpy as np
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import os
-from pickle2nc import convert_from_time, convert_from_id
+from pickle2nc import convert_tstep_pickle, convert_id_tspep_pickle
 from timeit import default_timer as timer
 
 
@@ -25,16 +25,18 @@ class tests():
     def __init__(self, write_routine,multi_process=False, particle_number = 500):
         
         self.write_routine = write_routine
-    
-        if self.write_routine == "write_pickle":
-            self.convert = convert_from_time
+        self.multi_process = multi_process
+        
+        if self.write_routine == "write_pickle_per_tstep":
+            self.convert = convert_tstep_pickle
             
-        elif self.write_routine =="write_1pickle":
-            self.convert = convert_from_id
+        elif self.write_routine =="write_pickle_per_id_tstep":
+            self.convert = convert_id_tspep_pickle
             self.multi_process = multi_process
             
-        if write_routine != "write_1pickle" and multi_process:
-            raise AttributeError("multi processing for conversion just available for 'write_1pickle'")
+        if write_routine != "write_pickle_per_id_tstep" and multi_process:
+            print "multi processing for conversion just available for 'write_1pickle'. set to 'False'"
+            self.multi_process = multi_process
         
         self.test_particle_number = particle_number
     
@@ -118,8 +120,13 @@ class tests():
         
 #%%        
 if __name__ == "__main__":
-    
-    write_routine = "write"
+    """
+    choose  write_routine from:
+        write, 
+        write_pickle_per_tstep, 
+        write_pickle_per_id_tstep
+    """
+    write_routine = "write_pickle_per_tstep"
     
     t = tests(write_routine,multi_process=False,particle_number=500)
     

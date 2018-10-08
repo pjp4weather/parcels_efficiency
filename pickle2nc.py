@@ -1,7 +1,12 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
-Created on Tue Oct  2 17:07:22 2018
+MODULE picke2nc
+
+This module contains methods that convert outputs from the pickle format to
+netcdf format (ParticleFile). Pickle files can be saved per time step and id 
+(id_tstep_pickle) or per time step with ALL ids in one pickle (tstep_pickle)
+
 
 @author: paul
 """
@@ -12,10 +17,17 @@ from timeit import default_timer as timer
 import multiprocessing as mp
 import glob
 
-
-def get_netcdf(pfile,n_id,n_time):
+def get_pfile(pfile):
     """
-    initialize a netcdf file
+    Get the ParticleFile.
+    
+    Parameters:
+    -----------
+    pfile: ParticleFile instance
+    
+    Returns:
+    -------
+    Unwrapped (?) variables (id, time,lat, lon, z)
     """
     
     ids = pfile.id
@@ -23,21 +35,34 @@ def get_netcdf(pfile,n_id,n_time):
     lat = pfile.lat
     lon = pfile.lon
     z = pfile.z
-    return ids,time,lat,lon,z, pfile
+    
+    return ids,time,lat,lon,z
 
 # =============================================================================
 # convert from pickles saved per time step (WITH all ids)
 # =============================================================================
 
-def convert_from_time(pfile,multiProcess):
+def convert_tstep_pickle(pfile,multiProcess):
     """
-    Main method that converts pickle files to one netcdf file
+    Writes outputs from pickle files from time step pickles 
+    (all ids in one file per time step) to ParticleFile instance
+    
+    Parameters:
+    -----------
+    pfile: ParticleFile instance
+    
+    multiProcess: boolean 
+        Use multiprocessing for reading pickles. Currently, not possible.
+    
+    Returns
+    -------
+    conversion time : float
     """
     
     def sort_list(path):
         """
-        method to sort a list of all pathes to output by 
-            1. time stamp
+        method to sort a list of all pathes to output by their name that is the
+        time stamp.
         """
         splitted = path.split("/")
         return float(splitted[1][:-4])    
@@ -46,6 +71,22 @@ def convert_from_time(pfile,multiProcess):
         """
         read pickles using a loop over all files and return one array 
         for each variable
+        
+        Parameters
+        -----------
+        file_list : list of strings
+            List that  contains all file names in the output directory
+        
+        n_id : int
+            Number of ids
+        
+        n_time : int
+            Number if time steps
+            
+        Returns
+        -------
+        Merged arrays for id, time, lat, lon, z
+        
         """
         #generate sorted list
         file_list = [x[:-4] for x in file_list]
@@ -78,7 +119,7 @@ def convert_from_time(pfile,multiProcess):
     n_id = len(np.load("out/"+time_list[0])[0,:])
     
     # init netcdf file
-    ids,time,lat,lon,z,dataset = get_netcdf(pfile,n_id,n_time)
+    ids,time,lat,lon,z = get_pfile(pfile)
     
     # read data and write to netcdf file
     ids[:,:], time[:,:],lat[:,:],lon[:,:],z[:,:] = read(time_list,n_id,n_time)
@@ -93,16 +134,28 @@ def convert_from_time(pfile,multiProcess):
 # =============================================================================
 def load(file_str):
     """
-    mathod to load one pickle file
+    mehod to load one pickle file id_tspep_pickle
     """
     #print file_str
     arr = np.load(file_str)
     return arr[0],arr[1],arr[2],arr[3],arr[4] 
 
 
-def convert_from_id(pfile,multiProcess):
+def convert_id_tspep_pickle(pfile,multiProcess):
     """
-    Main method that converts pickle files to one netcdf file
+    Writes outputs from pickle files from time step pickles 
+    (all ids in one file per time step) to ParticleFile instance
+    
+    Parameters:
+    -----------
+    pfile: ParticleFile instance
+    
+    multiProcess: boolean 
+        Use multiprocessing for reading pickles. 
+    
+    Returns
+    -------
+    conversion time : float
     """
     def sort_list(path):
         """
@@ -117,6 +170,22 @@ def convert_from_id(pfile,multiProcess):
         """
         read pickles using a loop over all files and return one array 
         for each variable
+        
+        Parameters
+        -----------
+        file_list : list of strings
+            List that  contains all file names in the output directory
+        
+        n_id : int
+            Number of ids
+        
+        n_time : int
+            Number if time steps
+            
+        Returns
+        -------
+        Merged arrays for id, time, lat, lon, z
+        
         """
         #generate sorted list
         file_list = [x[:-4] for x in file_list]
@@ -142,7 +211,13 @@ def convert_from_id(pfile,multiProcess):
     
     def read_mp():
         """
-        read pickles using multiprocessing
+        read pickles using a multiprocessing
+        
+            
+        Returns
+        -------
+        Merged arrays for id, time, lat, lon, z
+        
         """
         # init a pool that runs on all cores of the machine
         p = mp.Pool()
@@ -170,7 +245,7 @@ def convert_from_id(pfile,multiProcess):
     n_time = len(file_list)
     
     # init netcdf file
-    ids,time,lat,lon,z,dataset = get_netcdf(pfile,n_id,n_time)
+    ids,time,lat,lon,z,dataset = get_pfile(pfile)
     
     # read data and write to netcdf file
     if multiProcess:
