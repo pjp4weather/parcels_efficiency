@@ -3,6 +3,10 @@
 """
 Created on Thu Oct  4 16:06:43 2018
 
+Problem: why does it not add a particle when i>60 in 120 iters? How does adding 
+and removing work correctly
+
+Problem: ids 
 @author: paul
 """
 
@@ -15,6 +19,7 @@ from pickle2nc import convert_tstep_pickle, convert_id_tspep_pickle
 from timeit import default_timer as timer
 import xarray as xr
 
+plt.close("all")
 class tests():
     """
     class that contains all tests that should be performed with a new writing 
@@ -38,8 +43,11 @@ class tests():
             self.multi_process = multi_process
         
         self.test_particle_number = particle_number
+        
+        
+        
     
-    def timing(self):
+    def timing(self,integration_time_days=6,addParticle=False,removeParticle=False):
         """
         Method to compute the time needed for the integration, writing of data
         and conversion to netcdf
@@ -50,7 +58,6 @@ class tests():
         os.system("rm -rf out")
         os.mkdir("out")
         
-        integration_time_days = 6
         iters = integration_time_days * 24
                 
         write_time_arr = np.zeros(iters)
@@ -80,7 +87,15 @@ class tests():
             end_writing = timer()
             
             write_time_arr[i] = end_writing - start_writing
-        
+            
+            if i == 60 and addParticle:
+                print "add particle"
+                pset.add(JITParticle(lon=333158.281250, lat=163265.828125,fieldset=fieldset))
+                
+            if i == 10 and removeParticle:
+                print "remove particle"
+                pset.remove(1)
+                
         self.time_convert = 0
         
         if self.write_routine !="write":
@@ -117,11 +132,18 @@ class tests():
         ax.set_title("Number of particles: " + str(self.test_particle_number) +", " +self.write_routine +", mp: " +str(self.multi_process))
        
         
-    def equality(self):
+        
+        
+        
+        
+        
+    def equality(self,addParticle=True,removeParticle=True):
         """
         Check if new writing routine writes exactly the same output as the 
         default one
         """
+        if self.write_routine == "write":
+            raise AttributeError("There is no equlity test between write_routine 'write' and 'write'")
         np.random.seed(0)
 
         os.system("rm -rf out")
@@ -160,6 +182,12 @@ class tests():
             
             # new writing routine
             write(pset, pset[0].time)
+            
+            if i==5 and addParticle:
+                pset.add(JITParticle(lon=333158.281250, lat=163265.828125,fieldset=fieldset))
+            
+            if i == 1 and removeParticle:
+                pset.remove(0)
 
         self.time_convert = self.convert(pfile_compare,self.multi_process)
         
@@ -169,16 +197,28 @@ class tests():
     def _comapre_outputs(self,file1,file2):
         """
         Check if the two input files are identical
-        
+        Parameters
+        ----------
+        file1, file2: str
+            path to the to files that should be compared
         """
         read_file1 = xr.open_dataset(file1)
         read_file2 = xr.open_dataset(file2)
         
+        read_file1=read_file1.fillna(9999999)
+        read_file2 = read_file2.fillna(9999999)
+        
         compare = (read_file1==read_file2).all()
         
         print compare
-            
-#%%        
+        if not compare.time  and not compare.trajectory and compare.lat:
+            print "trajectory and time are False because nc-file from NPY-files has full \
+            time and trajectory arrays although particles where removed"
+        
+     
+        
+        
+#%% Just one of the below cells can be executed otherwise it will arise an error       
 if __name__ == "__main__":
     """
     choose  write_routine from:
@@ -188,11 +228,13 @@ if __name__ == "__main__":
     """
     write_routine = "write_pickle_per_tstep"
     
-    t = tests(write_routine,multi_process=False,particle_number=500)
+    tt = tests(write_routine,multi_process=False,particle_number=400)
     
     # Test timing
-    t.timing()
-    t.plot_timing()
+    tt.timing(integration_time_days=5,addParticle=True,removeParticle=True)
+    tt.plot_timing()
     
-    # Test if writing routine is identical
-    t.equality()
+#%% # Test if writing routine is identical 
+    write_routine = "write_pickle_per_tstep"
+    eqt = tests(write_routine,multi_process=False,particle_number=400)
+    eqt.equality()

@@ -7,6 +7,11 @@ This module contains methods that convert outputs from the pickle format to
 netcdf format (ParticleFile). Pickle files can be saved per time step and id 
 (id_tstep_pickle) or per time step with ALL ids in one pickle (tstep_pickle)
 
+TODO:
+        Problem if IDs empty value is not similiar when read from NPY file then 
+        when read from nc?
+        
+        Problem if time is not nan if file is removed?
 
 @author: paul
 """
@@ -70,7 +75,11 @@ def convert_tstep_pickle(pfile,multiProcess):
     def read(file_list,n_id,n_time):
         """
         read pickles using a loop over all files and return one array 
-        for each variable
+        for each variable. 
+        
+        Note: id and time arrays are filled in advance and 
+        not read for each time step from the array because they are known in 
+        advance.
         
         Parameters
         -----------
@@ -93,19 +102,36 @@ def convert_tstep_pickle(pfile,multiProcess):
         file_list = map(float,file_list)
         file_list.sort()
         
+        # infer array size of dimension id from the highest id in NPY file from 
+        # last time step
+        first_id = int(np.load("out/"+str(file_list[0])+".npy")[0,0])
+        n_id = int(np.load("out/"+str(file_list[-1])+".npy")[0,-1]+1)
+        
         # merge allocate arrays
         id_m, time_m,lon_m,lat_m,z_m =\
                 map(lambda n,m: np.zeros((n,m)), \
-                    [n_id,n_id,n_id,n_id,n_id],[n_time,n_time,n_time,n_time,n_time,])
+                    [n_id,n_id,n_id,n_id,n_id],[n_time,n_time,n_time,n_time,n_time])
+        
+        # id and time array are known in advance and can be assigned immidately
+        id_m[:,:]   = id_m[:,:] + np.arange(first_id,n_id,dtype=int).reshape(n_id,1)
+        time_m[:,:] = np.array(file_list).reshape(1,n_time)
+        
+        # fill lat,lon,z arrays with nans 
+        lon_m[lon_m==0] = np.nan
+        lat_m[lat_m==0] = np.nan
+        z_m[z_m==0] = np.nan
         
         # loop over all files
         for j in range(n_time):
             arr = np.load("out/"+str(file_list[j])+".npy")
-            id_m[:,j] = arr[0,:]
-            time_m[:,j] = arr[1,:]
-            lat_m[:,j] = arr[2,:]
-            lon_m[:,j] = arr[3,:]
-            z_m[:,j] = arr[4,:]
+            
+            indices =  np.array(arr[0,:],dtype=int)
+            
+            #id_m[indices,j] = arr[0,:]
+            #time_m[indices,j] = arr[1,:]
+            lat_m[indices,j] = arr[2,:]
+            lon_m[indices,j] = arr[3,:]
+            z_m[indices,j] = arr[4,:]
                 
         return id_m, time_m, lat_m, lon_m, z_m
     
@@ -114,8 +140,6 @@ def convert_tstep_pickle(pfile,multiProcess):
     # list of files
     time_list = os.listdir("out")
     n_time = len(time_list)
-    
-
     n_id = len(np.load("out/"+time_list[0])[0,:])
     
     # init netcdf file
