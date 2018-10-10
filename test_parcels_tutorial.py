@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 import os
 from pickle2nc import convert_tstep_pickle, convert_id_tspep_pickle
 from timeit import default_timer as timer
-
-
+import xarray as xr
 
 class tests():
     """
@@ -71,6 +70,7 @@ class tests():
             raise AttributeError("'ParticleFile' does not has writing routine '"+self.write_routine +"'")
         
         for i in range(iters):
+            
             pset.execute(AdvectionRK4,                 # the kernel (which defines how particles move)
                          runtime=timedelta(hours=1),    # the total length of the run
                          dt=timedelta(minutes=5))      # the timestep of the kernel
@@ -95,8 +95,6 @@ class tests():
         self.time_writing = np.sum(write_time_arr)
         self.time_integration = self.time_total - self.time_writing - self.time_convert
         
-            
-    
     def plot_timing(self):
         """
         plot the results of the timing test
@@ -117,7 +115,69 @@ class tests():
         ax.set_ylabel("s")
         plt.ylim(0,100)
         ax.set_title("Number of particles: " + str(self.test_particle_number) +", " +self.write_routine +", mp: " +str(self.multi_process))
+       
         
+    def equality(self):
+        """
+        Check if new writing routine writes exactly the same output as the 
+        default one
+        """
+        np.random.seed(0)
+
+        os.system("rm -rf out")
+        os.mkdir("out")
+        
+        integration_time_days = 1
+        iters = integration_time_days * 12
+        
+        fieldset = FieldSet.from_parcels("/home/paul/parcels_examples/MovingEddies_data/moving_eddies")
+        pset = ParticleSet.from_list(fieldset=fieldset,   # the fields on which the particles are advected
+                                     pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
+                                     lon = np.random.uniform(low=3.3e5, high=3.4e5, size=self.test_particle_number),  # a vector of release longitudes 
+                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number)  )  # a vector of release latitudes
+       
+        # output file from for default writing routine
+        output_name = "output.nc"
+        pfile = pset.ParticleFile(name=output_name, outputdt=timedelta(hours=1))
+        
+        # output file from new writing routine
+        output_name_compare = "output_compare.nc"
+        pfile_compare = pset.ParticleFile(name=output_name_compare, outputdt=timedelta(hours=1))
+        
+        # evaluate to the chosen writing routine
+        try:
+            write = eval("pfile_compare."+self.write_routine)
+        except:
+            raise AttributeError("'ParticleFile' does not has writing routine '"+self.write_routine +"'")
+        
+        for i in range(iters):
+            pset.execute(AdvectionRK4,                 # the kernel (which defines how particles move)
+                         runtime=timedelta(hours=1),    # the total length of the run
+                         dt=timedelta(minutes=5))      # the timestep of the kernel
+            
+            # default writing routine
+            pfile.write(pset, pset[0].time)
+            
+            # new writing routine
+            write(pset, pset[0].time)
+
+        self.time_convert = self.convert(pfile_compare,self.multi_process)
+        
+        self._comapre_outputs(output_name,output_name_compare)
+
+    
+    def _comapre_outputs(self,file1,file2):
+        """
+        Check if the two input files are identical
+        
+        """
+        read_file1 = xr.open_dataset(file1)
+        read_file2 = xr.open_dataset(file2)
+        
+        compare = (read_file1==read_file2).all()
+        
+        print compare
+            
 #%%        
 if __name__ == "__main__":
     """
@@ -130,5 +190,9 @@ if __name__ == "__main__":
     
     t = tests(write_routine,multi_process=False,particle_number=500)
     
+    # Test timing
     t.timing()
     t.plot_timing()
+    
+    # Test if writing routine is identical
+    t.equality()
