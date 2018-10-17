@@ -9,8 +9,8 @@ and removing work correctly
 Problem: ids 
 @author: paul
 """
-
 from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4, plotTrajectoriesFile
+from parcels import ErrorCode
 import numpy as np
 from datetime import timedelta
 import matplotlib.pyplot as plt
@@ -20,6 +20,11 @@ from timeit import default_timer as timer
 import xarray as xr
 
 plt.close("all")
+
+def DeleteParticle(particle, fieldset, time, dt):
+    print("Particle lost !! (%g %g %g %g)" % (particle.lon, particle.lat, particle.depth, particle.time))
+    particle.delete()
+
 class tests():
     """
     class that contains all tests that should be performed with a new writing 
@@ -65,8 +70,9 @@ class tests():
         fieldset = FieldSet.from_parcels("/home/paul/parcels_examples/MovingEddies_data/moving_eddies")
         pset = ParticleSet.from_list(fieldset=fieldset,   # the fields on which the particles are advected
                                      pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
-                                     lon = np.random.uniform(low=3.3e5, high=3.4e5, size=self.test_particle_number),  # a vector of release longitudes 
-                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number)  )  # a vector of release latitudes
+                                     lon = np.random.uniform(low=0.3e5, high=5.4e5, size=self.test_particle_number),  # a vector of release longitudes 
+                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number),    # a vector of release latitudes
+                                     repeatdt=timedelta(days=1).total_seconds())
         output_name = "output.nc"
         pfile = pset.ParticleFile(name=output_name, outputdt=timedelta(hours=1))
         
@@ -80,7 +86,9 @@ class tests():
             
             pset.execute(AdvectionRK4,                 # the kernel (which defines how particles move)
                          runtime=timedelta(hours=1),    # the total length of the run
-                         dt=timedelta(minutes=5))      # the timestep of the kernel
+                         dt=timedelta(minutes=5),     # the timestep of the kernel
+                         recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle})  
+                        
             
             start_writing = timer()
             write(pset, pset[0].time)
@@ -150,14 +158,15 @@ class tests():
         os.mkdir("out")
         
         integration_time_days = 1
-        iters = integration_time_days * 12
+        iters = integration_time_days * 24
         
         fieldset = FieldSet.from_parcels("/home/paul/parcels_examples/MovingEddies_data/moving_eddies")
         pset = ParticleSet.from_list(fieldset=fieldset,   # the fields on which the particles are advected
                                      pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
-                                     lon = np.random.uniform(low=3.3e5, high=3.4e5, size=self.test_particle_number),  # a vector of release longitudes 
-                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number)  )  # a vector of release latitudes
-       
+                                     lon = np.random.uniform(low=0.3e5, high=5.4e5, size=self.test_particle_number),  # a vector of release longitudes 
+                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number),    # a vector of release latitudes
+                                     repeatdt=timedelta(hours=5).total_seconds())
+        
         # output file from for default writing routine
         output_name = "output.nc"
         pfile = pset.ParticleFile(name=output_name, outputdt=timedelta(hours=1))
@@ -175,7 +184,8 @@ class tests():
         for i in range(iters):
             pset.execute(AdvectionRK4,                 # the kernel (which defines how particles move)
                          runtime=timedelta(hours=1),    # the total length of the run
-                         dt=timedelta(minutes=5))      # the timestep of the kernel
+                         dt=timedelta(minutes=5),      # the timestep of the kernel
+                         recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle}) 
             
             # default writing routine
             pfile.write(pset, pset[0].time)
@@ -205,14 +215,14 @@ class tests():
         read_file1 = xr.open_dataset(file1)
         read_file2 = xr.open_dataset(file2)
         
-        read_file1=read_file1.fillna(9999999)
+        read_file1 = read_file1.fillna(9999999)
         read_file2 = read_file2.fillna(9999999)
         
         compare = (read_file1==read_file2).all()
         
         print compare
         if not compare.time  and not compare.trajectory and compare.lat:
-            print "trajectory and time are False because nc-file from NPY-files has full \
+            print "trajectory is False because nc-file from NPY-files has full \
             time and trajectory arrays although particles where removed"
         
      
@@ -226,15 +236,15 @@ if __name__ == "__main__":
         write_pickle_per_tstep, 
         write_pickle_per_id_tstep
     """
-    write_routine = "write_pickle_per_tstep"
+    write_routine = "write"#_pickle_per_tstep"
     
-    tt = tests(write_routine,multi_process=False,particle_number=400)
+    tt = tests(write_routine,multi_process=False,particle_number=10)
     
     # Test timing
-    tt.timing(integration_time_days=5,addParticle=True,removeParticle=True)
+    tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
     tt.plot_timing()
     
-#%% # Test if writing routine is identical 
-    write_routine = "write_pickle_per_tstep"
-    eqt = tests(write_routine,multi_process=False,particle_number=400)
-    eqt.equality()
+    # Test if writing routine is identical 
+#    write_routine = "write_pickle_per_tstep"
+#    eqt = tests(write_routine,multi_process=False,particle_number=10)
+#    eqt.equality()

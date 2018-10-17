@@ -9,10 +9,24 @@ netcdf format (ParticleFile). Pickle files can be saved per time step and id
 
 TODO:
         Problem if IDs empty value is not similiar when read from NPY file then 
-        when read from nc?
+        when read from nc? --> define fill value
         
-        Problem if time is not nan if file is removed?
-
+        Is it a problem if time is not nan if particle is removed? -->time has to be nan
+        
+        Can time output be assigned in advance or can it be different form particle 
+        to particle? --> no
+        
+        
+        How does the kernel work?
+        ============================
+        
+        Tests: deleting and ading
+            autmotical removal by kernel
+            ·particle.delete
+            · repeatdt: add particles at a time step dt
+            · export particles just when 
+            · parcels test
+            
 @author: paul
 """
 
@@ -104,7 +118,6 @@ def convert_tstep_pickle(pfile,multiProcess):
         
         # infer array size of dimension id from the highest id in NPY file from 
         # last time step
-        first_id = int(np.load("out/"+str(file_list[0])+".npy")[0,0])
         n_id = int(np.load("out/"+str(file_list[-1])+".npy")[0,-1]+1)
         
         # merge allocate arrays
@@ -112,28 +125,43 @@ def convert_tstep_pickle(pfile,multiProcess):
                 map(lambda n,m: np.zeros((n,m)), \
                     [n_id,n_id,n_id,n_id,n_id],[n_time,n_time,n_time,n_time,n_time])
         
-        # id and time array are known in advance and can be assigned immidately
-        id_m[:,:]   = id_m[:,:] + np.arange(first_id,n_id,dtype=int).reshape(n_id,1)
-        time_m[:,:] = np.array(file_list).reshape(1,n_time)
-        
         # fill lat,lon,z arrays with nans 
+        id_m[id_m==0] = np.nan
+        time_m[time_m==0] =np.nan
         lon_m[lon_m==0] = np.nan
         lat_m[lat_m==0] = np.nan
         z_m[z_m==0] = np.nan
         
+        # initiated indeces for time axis
+        time_index = np.zeros(n_id,dtype=int)
+        
         # loop over all files
-        for j in range(n_time):
-            arr = np.load("out/"+str(file_list[j])+".npy")
+        for i in range(n_time):
+            arr = np.load("out/"+str(file_list[i])+".npy")
             
-            indices =  np.array(arr[0,:],dtype=int)
+            # get ids that going to be filled
+            id_ind =  np.array(arr[0,:],dtype=int)
             
-            #id_m[indices,j] = arr[0,:]
-            #time_m[indices,j] = arr[1,:]
-            lat_m[indices,j] = arr[2,:]
-            lon_m[indices,j] = arr[3,:]
-            z_m[indices,j] = arr[4,:]
-                
-        return id_m, time_m, lat_m, lon_m, z_m
+            # get the corresponding time indeces
+            t_ind = time_index[id_ind]
+
+            id_m[id_ind,t_ind] = arr[0,:]
+            time_m[id_ind,t_ind] = arr[1,:]
+            lat_m[id_ind,t_ind] = arr[2,:]
+            lon_m[id_ind,t_ind] = arr[3,:]
+            z_m[id_ind,t_ind] = arr[4,:]
+           
+            # new time index for ids that where filled with values
+            time_index[id_ind]  = time_index[id_ind]  + 1   
+        
+        # remove rows that are completely filled with nan values
+        id_out = id_m[~np.isnan(lat_m).all(axis=1)]
+        time_out = time_m[~np.isnan(lat_m).all(axis=1)]
+        lat_out = lat_m[~np.isnan(lat_m).all(axis=1)]
+        lon_out = lon_m[~np.isnan(lat_m).all(axis=1)]
+        z_out = z_m[~np.isnan(lat_m).all(axis=1)]
+        
+        return id_out, time_out, lat_out, lon_out, z_out
     
     start_time = timer()
     
@@ -153,6 +181,7 @@ def convert_tstep_pickle(pfile,multiProcess):
     
     return convert_time
  
+
 # =============================================================================
 # convert from pickles saved per time step and id
 # =============================================================================
