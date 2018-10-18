@@ -215,20 +215,15 @@ class tests():
         read_file1 = xr.open_dataset(file1)
         read_file2 = xr.open_dataset(file2)
         
+        # fill nans because (np.nan == np.nan) would yield False
         read_file1 = read_file1.fillna(9999999)
         read_file2 = read_file2.fillna(9999999)
         
         compare = (read_file1==read_file2).all()
         
         print compare
-        if not compare.time  and not compare.trajectory and compare.lat:
-            print "trajectory is False because nc-file from NPY-files has full \
-            time and trajectory arrays although particles where removed"
+
         
-     
-        
-        
-#%% Just one of the below cells can be executed otherwise it will arise an error       
 if __name__ == "__main__":
     """
     choose  write_routine from:
@@ -236,15 +231,15 @@ if __name__ == "__main__":
         write_pickle_per_tstep, 
         write_pickle_per_id_tstep
     """
-    write_routine = "write"#_pickle_per_tstep"
+#    write_routine = "write"#_pickle_per_tstep"
+#    
+#    tt = tests(write_routine,multi_process=False,particle_number=10)
+#    
+#    # Test timing
+#    tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
+#    tt.plot_timing()
     
-    tt = tests(write_routine,multi_process=False,particle_number=10)
-    
-    # Test timing
-    tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
-    tt.plot_timing()
-    
-    # Test if writing routine is identical 
-#    write_routine = "write_pickle_per_tstep"
-#    eqt = tests(write_routine,multi_process=False,particle_number=10)
-#    eqt.equality()
+#     Test if writing routine is identical 
+    write_routine = "write_pickle_per_tstep"
+    eqt = tests(write_routine,multi_process=False,particle_number=10)
+    eqt.equality()

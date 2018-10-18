@@ -7,25 +7,18 @@ This module contains methods that convert outputs from the pickle format to
 netcdf format (ParticleFile). Pickle files can be saved per time step and id 
 (id_tstep_pickle) or per time step with ALL ids in one pickle (tstep_pickle)
 
-TODO:
-        Problem if IDs empty value is not similiar when read from NPY file then 
-        when read from nc? --> define fill value
-        
-        Is it a problem if time is not nan if particle is removed? -->time has to be nan
-        
-        Can time output be assigned in advance or can it be different form particle 
-        to particle? --> no
-        
+TODO:        
         
         How does the kernel work?
         ============================
         
-        Tests: deleting and ading
-            autmotical removal by kernel
-            ·particle.delete
-            · repeatdt: add particles at a time step dt
-            · export particles just when 
-            · parcels test
+        Tests: 
+            · deleting and ading => passed
+            · autmotical removal by kernel => passed
+            · particle.delete => pased
+            · repeatdt: add particles at a time step dt => pased
+            · export particles just when  => ???
+            · parcels test => to be done on gemini
             
 @author: paul
 """
@@ -126,8 +119,8 @@ def convert_tstep_pickle(pfile,multiProcess):
                     [n_id,n_id,n_id,n_id,n_id],[n_time,n_time,n_time,n_time,n_time])
         
         # fill lat,lon,z arrays with nans 
-        id_m[id_m==0] = np.nan
-        time_m[time_m==0] =np.nan
+        id_m[id_m==0] = ids._FillValue
+        time_m[time_m==0] = np.nan
         lon_m[lon_m==0] = np.nan
         lat_m[lat_m==0] = np.nan
         z_m[z_m==0] = np.nan
