@@ -7,18 +7,6 @@ This module contains methods that convert outputs from the pickle format to
 netcdf format (ParticleFile). Pickle files can be saved per time step and id 
 (id_tstep_pickle) or per time step with ALL ids in one pickle (tstep_pickle)
 
-TODO:        
-        
-        How does the kernel work?
-        ============================
-        
-        Tests: 
-            · deleting and adding => passed
-            · autmotical removal by kernel => passed
-            · particle.delete => pased
-            · repeatdt: add particles at a time step dt => pased
-            · export particles just when  => ???
-            · parcels test => to be done on gemini
             
 @author: paul
 """
@@ -79,7 +67,7 @@ def convert_tstep_pickle(pfile,multiProcess):
         splitted = path.split("/")
         return float(splitted[1][:-4])    
     
-    def read(file_list):
+    def read(file_list,id_fill):
         """
         read pickles using a loop over all files and return one array 
         for each variable. 
@@ -105,70 +93,68 @@ def convert_tstep_pickle(pfile,multiProcess):
         
         # infer array size of dimension id from the highest id in NPY file from 
         # last time step
-        n_id = int(max(np.load("out/"+str(file_list[-1])+".npy")[0,:]+1))
+        data_dict  = np.load("out/"+str(file_list[-1])+".npy").item()
+        
+        n_id = int(max(data_dict["ids"])+1)
         n_time = len(file_list)
         
-        # merge allocate arrays
-        id_m, time_m,lon_m,lat_m,z_m =\
-                map(lambda n,m: np.zeros((n,m)), \
-                    [n_id,n_id,n_id,n_id,n_id],[n_time,n_time,n_time,n_time,n_time])
-        
-        # fill lat,lon,z arrays with nans 
-        id_m[id_m==0] = ids._FillValue
-        time_m[time_m==0] = np.nan
-        lon_m[lon_m==0] = np.nan
-        lat_m[lat_m==0] = np.nan
-        z_m[z_m==0] = np.nan
+        # dictionary for merging
+        merge_dict = {}
+        for var in data_dict.keys():
+            merge_dict[var] = np.zeros((n_id,n_time))
+            
+            if var!="ids":
+                merge_dict[var][:] = np.nan
+            else:
+                merge_dict[var][:] = id_fill
         
         # initiated indeces for time axis
         time_index = np.zeros(n_id,dtype=int)
         
         # loop over all files
         for i in range(n_time):
-            arr = np.load("out/"+str(file_list[i])+".npy")
+            data_dict = np.load("out/"+str(file_list[i])+".npy").item()
             
             # don't convert to netdcf if all values are nan for a time step
-            if np.isnan(arr[0,:]).all():
-                id_m, time_m,lon_m,lat_m,z_m = map(lambda x: x[:,:-1], 
-                                                   [id_m, time_m,lon_m,lat_m,z_m])
+            if np.isnan(data_dict["ids"]).all():
+                for key in merge_dict.keys():
+                    merge_dict[key] = merge_dict[key][:,:-1]
                 continue
             
             # get ids that going to be filled
-            id_ind =  np.array(arr[0,:],dtype=int)
+            id_ind =  np.array(data_dict["ids"],dtype=int)
             
             # get the corresponding time indeces
             t_ind = time_index[id_ind]
-
-            id_m[id_ind,t_ind] = arr[0,:]
-            time_m[id_ind,t_ind] = arr[1,:]
-            lat_m[id_ind,t_ind] = arr[2,:]
-            lon_m[id_ind,t_ind] = arr[3,:]
-            z_m[id_ind,t_ind] = arr[4,:]
+            
+            # write into merge array
+            for key in merge_dict.keys():
+                merge_dict[key][id_ind,t_ind] = data_dict[key]
            
             # new time index for ids that where filled with values
             time_index[id_ind]  = time_index[id_ind]  + 1
-    
         
         # remove rows that are completely filled with nan values
-        id_out = id_m[~np.isnan(lat_m).all(axis=1)]
-        time_out = time_m[~np.isnan(lat_m).all(axis=1)]
-        lat_out = lat_m[~np.isnan(lat_m).all(axis=1)]
-        lon_out = lon_m[~np.isnan(lat_m).all(axis=1)]
-        z_out = z_m[~np.isnan(lat_m).all(axis=1)]
+        out_dict = {}
+        for var in merge_dict.keys():
+            out_dict[var] = merge_dict[var][~np.isnan(merge_dict["lat"]).all(axis=1)]
         
-        return id_out, time_out, lat_out, lon_out, z_out
-
+        return out_dict
+        
     start_time = timer()
     
     # list of files
     time_list = os.listdir("out")
     
-    # init netcdf file
-    ids,time,lat,lon,z = get_pfile(pfile)
     
-    # read data and write to netcdf file
-    ids[:,:], time[:,:],lat[:,:],lon[:,:],z[:,:] = read(time_list)
-            
+    data_dict = read(time_list,pfile.id._FillValue)
+
+    for var in data_dict.keys():
+        if var !="ids":
+            getattr(pfile, var)[:,:] = data_dict[var]
+        else:
+            getattr(pfile, "id")[:,:] = data_dict[var]
+           
     end_time = timer()
     convert_time = end_time-start_time
     

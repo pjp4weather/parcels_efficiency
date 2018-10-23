@@ -9,7 +9,7 @@ and removing work correctly
 Problem: ids 
 @author: paul
 """
-from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4, plotTrajectoriesFile
+from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4, plotTrajectoriesFile, Variable
 from parcels import ErrorCode
 import numpy as np
 from datetime import timedelta
@@ -24,6 +24,12 @@ plt.close("all")
 def DeleteParticle(particle, fieldset, time, dt):
     print("Particle lost !! (%g %g %g %g)" % (particle.lon, particle.lat, particle.depth, particle.time))
     particle.delete()
+    
+def Ageing(particle, fieldset, time, dt):
+    particle.age += dt 
+
+class PlasticParticle(JITParticle):
+    age = Variable('age', dtype=np.float32, initial=0.)
 
 class tests():
     """
@@ -162,7 +168,7 @@ class tests():
         
         fieldset = FieldSet.from_parcels("/home/paul/parcels_examples/MovingEddies_data/moving_eddies")
         pset = ParticleSet.from_list(fieldset=fieldset,   # the fields on which the particles are advected
-                                     pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
+                                     pclass=PlasticParticle,  # the type of particles (JITParticle or ScipyParticle)
                                      lon = np.random.uniform(low=0.3e5, high=5.4e5, size=self.test_particle_number),  # a vector of release longitudes 
                                      lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number),    # a vector of release latitudes
                                      repeatdt=timedelta(hours=5).total_seconds())
@@ -181,8 +187,10 @@ class tests():
         except:
             raise AttributeError("'ParticleFile' does not has writing routine '"+self.write_routine +"'")
         
+        kernel = AdvectionRK4 + pset.Kernel(Ageing)
+        
         for i in range(iters):
-            pset.execute(AdvectionRK4,                 # the kernel (which defines how particles move)
+            pset.execute(kernel,                 # the kernel (which defines how particles move)
                          runtime=timedelta(hours=1),    # the total length of the run
                          dt=timedelta(minutes=5),      # the timestep of the kernel
                          recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle}) 
@@ -194,7 +202,7 @@ class tests():
             write(pset, pset[0].time)
             
             if i==5 and addParticle:
-                pset.add(JITParticle(lon=333158.281250, lat=163265.828125,fieldset=fieldset))
+                pset.add(PlasticParticle(lon=333158.281250, lat=163265.828125,fieldset=fieldset))
             
             if i == 1 and removeParticle:
                 pset.remove(0)
@@ -215,6 +223,7 @@ class tests():
         read_file1 = xr.open_dataset(file1)
         read_file2 = xr.open_dataset(file2)
         
+        print read_file1
         # fill nans because (np.nan == np.nan) would yield False
         read_file1 = read_file1.fillna(9999999)
         read_file2 = read_file2.fillna(9999999)
@@ -233,7 +242,7 @@ if __name__ == "__main__":
     """
 #    write_routine = "write"#_pickle_per_tstep"
 #    
-#    tt = tests(write_routine,multi_process=False,particle_number=10)
+#    tt = tests(write_routine,multi_process=False,particle_number=300)
 #    
 #    # Test timing
 #    tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
