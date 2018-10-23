@@ -13,7 +13,7 @@ TODO:
         ============================
         
         Tests: 
-            · deleting and ading => passed
+            · deleting and adding => passed
             · autmotical removal by kernel => passed
             · particle.delete => pased
             · repeatdt: add particles at a time step dt => pased
@@ -79,7 +79,7 @@ def convert_tstep_pickle(pfile,multiProcess):
         splitted = path.split("/")
         return float(splitted[1][:-4])    
     
-    def read(file_list,n_id,n_time):
+    def read(file_list):
         """
         read pickles using a loop over all files and return one array 
         for each variable. 
@@ -93,12 +93,6 @@ def convert_tstep_pickle(pfile,multiProcess):
         file_list : list of strings
             List that  contains all file names in the output directory
         
-        n_id : int
-            Number of ids
-        
-        n_time : int
-            Number if time steps
-            
         Returns
         -------
         Merged arrays for id, time, lat, lon, z
@@ -111,7 +105,8 @@ def convert_tstep_pickle(pfile,multiProcess):
         
         # infer array size of dimension id from the highest id in NPY file from 
         # last time step
-        n_id = int(np.load("out/"+str(file_list[-1])+".npy")[0,-1]+1)
+        n_id = int(max(np.load("out/"+str(file_list[-1])+".npy")[0,:]+1))
+        n_time = len(file_list)
         
         # merge allocate arrays
         id_m, time_m,lon_m,lat_m,z_m =\
@@ -132,6 +127,12 @@ def convert_tstep_pickle(pfile,multiProcess):
         for i in range(n_time):
             arr = np.load("out/"+str(file_list[i])+".npy")
             
+            # don't convert to netdcf if all values are nan for a time step
+            if np.isnan(arr[0,:]).all():
+                id_m, time_m,lon_m,lat_m,z_m = map(lambda x: x[:,:-1], 
+                                                   [id_m, time_m,lon_m,lat_m,z_m])
+                continue
+            
             # get ids that going to be filled
             id_ind =  np.array(arr[0,:],dtype=int)
             
@@ -145,7 +146,8 @@ def convert_tstep_pickle(pfile,multiProcess):
             z_m[id_ind,t_ind] = arr[4,:]
            
             # new time index for ids that where filled with values
-            time_index[id_ind]  = time_index[id_ind]  + 1   
+            time_index[id_ind]  = time_index[id_ind]  + 1
+    
         
         # remove rows that are completely filled with nan values
         id_out = id_m[~np.isnan(lat_m).all(axis=1)]
@@ -155,22 +157,23 @@ def convert_tstep_pickle(pfile,multiProcess):
         z_out = z_m[~np.isnan(lat_m).all(axis=1)]
         
         return id_out, time_out, lat_out, lon_out, z_out
-    
+
     start_time = timer()
     
     # list of files
     time_list = os.listdir("out")
-    n_time = len(time_list)
-    n_id = len(np.load("out/"+time_list[0])[0,:])
     
     # init netcdf file
     ids,time,lat,lon,z = get_pfile(pfile)
     
     # read data and write to netcdf file
-    ids[:,:], time[:,:],lat[:,:],lon[:,:],z[:,:] = read(time_list,n_id,n_time)
+    ids[:,:], time[:,:],lat[:,:],lon[:,:],z[:,:] = read(time_list)
             
     end_time = timer()
     convert_time = end_time-start_time
+    
+    if os.path.exists("out"):
+        os.system("rm -rf out")
     
     return convert_time
  
