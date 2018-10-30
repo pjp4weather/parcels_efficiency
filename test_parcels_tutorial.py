@@ -3,10 +3,6 @@
 """
 Created on Thu Oct  4 16:06:43 2018
 
-Problem: why does it not add a particle when i>60 in 120 iters? How does adding 
-and removing work correctly
-
-Problem: ids 
 @author: paul
 """
 from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4, plotTrajectoriesFile, Variable
@@ -14,8 +10,7 @@ from parcels import ErrorCode
 import numpy as np
 from datetime import timedelta
 import matplotlib.pyplot as plt
-import os
-from pickle2nc import convert_tstep_pickle, convert_id_tspep_pickle
+from npy2nc import convert_npy, convert_id_tspep_pickle
 from timeit import default_timer as timer
 import xarray as xr
 
@@ -42,8 +37,8 @@ class tests():
         self.write_routine = write_routine
         self.multi_process = multi_process
         
-        if self.write_routine == "write_pickle_per_tstep":
-            self.convert = convert_tstep_pickle
+        if self.write_routine == "write_npy":
+            self.convert = convert_npy
             
         elif self.write_routine =="write_pickle_per_id_tstep":
             self.convert = convert_id_tspep_pickle
@@ -65,9 +60,6 @@ class tests():
         """
         np.random.seed(0)
         start = timer()
-
-        os.system("rm -rf out")
-        os.mkdir("out")
         
         iters = integration_time_days * 24
                 
@@ -76,9 +68,9 @@ class tests():
         fieldset = FieldSet.from_parcels("/home/paul/parcels_examples/MovingEddies_data/moving_eddies")
         pset = ParticleSet.from_list(fieldset=fieldset,   # the fields on which the particles are advected
                                      pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
-                                     lon = np.random.uniform(low=0.3e5, high=5.4e5, size=self.test_particle_number),  # a vector of release longitudes 
-                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number),    # a vector of release latitudes
-                                     repeatdt=timedelta(days=1).total_seconds())
+                                     lon = np.random.uniform(low=3.3e5, high=3.4e5, size=self.test_particle_number),  # a vector of release longitudes 
+                                     lat=np.random.uniform(low=1.5e5, high=2.8e5, size=self.test_particle_number))    # a vector of release latitudes
+                                     
         output_name = "output.nc"
         pfile = pset.ParticleFile(name=output_name, outputdt=timedelta(hours=1))
         
@@ -93,7 +85,7 @@ class tests():
             pset.execute(AdvectionRK4,                 # the kernel (which defines how particles move)
                          runtime=timedelta(hours=1),    # the total length of the run
                          dt=timedelta(minutes=5),     # the timestep of the kernel
-                         recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle})  
+                         )  
                         
             
             start_writing = timer()
@@ -101,14 +93,6 @@ class tests():
             end_writing = timer()
             
             write_time_arr[i] = end_writing - start_writing
-            
-            if i == 60 and addParticle:
-                print "add particle"
-                pset.add(JITParticle(lon=333158.281250, lat=163265.828125,fieldset=fieldset))
-                
-            if i == 10 and removeParticle:
-                print "remove particle"
-                pset.remove(1)
                 
         self.time_convert = 0
         
@@ -131,7 +115,7 @@ class tests():
         #plt.close("all")
         
         fig,ax = plt.subplots(1,1)
-        
+        fs = 14
         ind = np.arange(0,4)
         tt, ti,tw, tc  = ax.bar(ind,[self.time_total,self.time_integration,self.time_writing,self.time_convert])
         
@@ -140,17 +124,11 @@ class tests():
         tw.set_facecolor('lime')
         tc.set_facecolor('steelblue')
         ax.set_xticks(ind)
-        ax.set_xticklabels(['Total','Integration', 'Writing', 'Converting'])
-        ax.set_ylabel("s")
-        plt.ylim(0,100)
+        ax.set_xticklabels(['Total','Integration', 'Writing', 'Converting'],fontsize=fs)
+        ax.set_ylabel("time [s]",fontsize=fs)
+        plt.ylim(0,200)
         ax.set_title("Number of particles: " + str(self.test_particle_number) +", " +self.write_routine +", mp: " +str(self.multi_process))
        
-        
-        
-        
-        
-        
-        
     def equality(self,addParticle=True,removeParticle=True):
         """
         Check if new writing routine writes exactly the same output as the 
@@ -159,9 +137,6 @@ class tests():
         if self.write_routine == "write":
             raise AttributeError("There is no equlity test between write_routine 'write' and 'write'")
         np.random.seed(0)
-
-        os.system("rm -rf out")
-        os.mkdir("out")
         
         integration_time_days = 1
         iters = integration_time_days * 24
@@ -232,23 +207,24 @@ class tests():
         
         print compare
 
-        
+#%%        
 if __name__ == "__main__":
     """
     choose  write_routine from:
         write, 
-        write_pickle_per_tstep, 
+        write_npy, 
         write_pickle_per_id_tstep
     """
-#    write_routine = "write"#_pickle_per_tstep"
-#    
-#    tt = tests(write_routine,multi_process=False,particle_number=300)
-#    
-#    # Test timing
-#    tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
-#    tt.plot_timing()
+    write_routine = "write_npy"
     
-#     Test if writing routine is identical 
-    write_routine = "write_pickle_per_tstep"
-    eqt = tests(write_routine,multi_process=False,particle_number=10)
-    eqt.equality()
+    tt = tests(write_routine,multi_process=False,particle_number=1000)
+    
+    # Test timing
+    tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
+    #%%
+    tt.plot_timing()
+    
+##     Test if writing routine is identical 
+#    write_routine = "write_pickle_per_tstep"
+#    eqt = tests(write_routine,multi_process=False,particle_number=10)
+#    eqt.equality()
