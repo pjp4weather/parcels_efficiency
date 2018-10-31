@@ -97,7 +97,7 @@ class tests():
 #%%        
 if __name__ == "__main__":
     
-    tt = tests(particle_number=100)
+    tt = tests(particle_number=1000)
     tt.timing(integration_time_days=6)
     tt.plot_timing()
     plotTrajectoriesFile("output.nc")

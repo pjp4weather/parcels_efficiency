@@ -1,14 +1,10 @@
-from parcels import FieldSet, Field, VectorField, ParticleFile, ParticleSet, JITParticle, Variable
+from parcels import FieldSet, ParticleFile, ParticleSet, JITParticle, Variable
 from parcels import ErrorCode
-from parcels import rng as random
 import numpy as np
 from glob import glob
 from parcels import timer
 import time as timelib
 from datetime import timedelta as delta
-import math
-from npy2nc import convert_tstep_pickle
-import os
 
 
 print 'Running file: %s' % __file__
@@ -126,11 +122,6 @@ for d in range(ndays/2):
     else:
         pfile.write(pset, pset[0].time)
     
-    timer.particlefile.stop()
-
-if new_write:
-    timer.particlefile.start()
-    convert_time = convert_tstep_pickle(pfile,False)
     timer.particlefile.stop()
     
 timer.root.stop()
