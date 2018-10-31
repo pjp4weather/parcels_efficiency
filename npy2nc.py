@@ -184,9 +184,9 @@ def load(file_str):
     return arr[0],arr[1],arr[2],arr[3],arr[4] 
 
 
-def convert_id_tspep_pickle(pfile,multiProcess):
+def convert_id_npy(pfile,multiProcess):
     """
-    Writes outputs from pickle files from time step pickles 
+    Writes outputs from npy files from time step pickles 
     (all ids in one file per time step) to ParticleFile instance
     
     Parameters:

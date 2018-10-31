@@ -10,7 +10,7 @@ from parcels import ErrorCode
 import numpy as np
 from datetime import timedelta
 import matplotlib.pyplot as plt
-from npy2nc import convert_npy, convert_id_tspep_pickle
+from npy2nc import convert_npy, convert_id_npy
 from timeit import default_timer as timer
 import xarray as xr
 
@@ -40,13 +40,13 @@ class tests():
         if self.write_routine == "write_npy":
             self.convert = convert_npy
             
-        elif self.write_routine =="write_pickle_per_id_tstep":
-            self.convert = convert_id_tspep_pickle
+        elif self.write_routine =="write_id_npy":
+            self.convert = convert_id_npy
             self.multi_process = multi_process
             
-        if write_routine != "write_pickle_per_id_tstep" and multi_process:
+        if write_routine != "write_id_npy" and multi_process:
             print "multi processing for conversion just available for 'write_1pickle'. set to 'False'"
-            self.multi_process = multi_process
+            self.multi_process = False
         
         self.test_particle_number = particle_number
         
@@ -127,7 +127,7 @@ class tests():
         ax.set_xticklabels(['Total','Integration', 'Writing', 'Converting'],fontsize=fs)
         ax.set_ylabel("time [s]",fontsize=fs)
         plt.ylim(0,200)
-        ax.set_title("Number of particles: " + str(self.test_particle_number) +", " +self.write_routine +", mp: " +str(self.multi_process))
+        ax.set_title("Particles: " + str(self.test_particle_number) +", " +self.write_routine +", mp: " +str(self.multi_process))
        
     def equality(self,addParticle=True,removeParticle=True):
         """
@@ -213,11 +213,11 @@ if __name__ == "__main__":
     choose  write_routine from:
         write, 
         write_npy, 
-        write_pickle_per_id_tstep
+        write_id_npy
     """
     write_routine = "write_npy"
     
-    tt = tests(write_routine,multi_process=False,particle_number=1000)
+    tt = tests(write_routine,multi_process=True,particle_number=1000)
     
     # Test timing
     tt.timing(integration_time_days=6,addParticle=False,removeParticle=False)
