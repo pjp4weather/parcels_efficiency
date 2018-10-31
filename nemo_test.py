@@ -106,7 +106,7 @@ else:
 timer.particlefile.stop()
 tic = timelib.time()
 
-ndays = 10
+ndays = 100
 timer.run = timer.Timer('Execution', parent=timer.root, start=False)
 
 for d in range(ndays/2):
